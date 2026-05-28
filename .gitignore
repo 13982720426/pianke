@@ -62,3 +62,18 @@ job-*.log
 
 # 内部审计 / 设计文档，不入库
 docs/
+
+# ===== Rust / Tauri 构建产物 =====
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# ===== Tauri 安装状态（用户本地数据）=====
+src-tauri/gen/
+
+# ===== Reasonix 工具内部文件 =====
+.reasonix/
+
+# ===== 临时脚本产物 =====
+scripts/build_tauri.sh
+scripts/check_tauri.sh
+scripts/gen_icons.py

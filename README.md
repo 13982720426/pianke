@@ -3,7 +3,9 @@
 > **让 AI 协助初筛与分组，把最终的审美决定权留给自己。**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg)](#一键启动推荐)
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#-桌面应用一键启动)
+[![Tauri](https://img.shields.io/badge/desktop-Tauri-ffc131?logo=tauri)](src-tauri/)
+[![Build](https://img.shields.io/github/actions/workflow/status/13982720426/pianke/build.yml?branch=tauri-desktop&label=build)](https://github.com/13982720426/pianke/actions/workflows/build.yml)
 [![License: Pianke v2](https://img.shields.io/badge/license-Pianke%20v2-cc785c.svg)](LICENSE)
 
 **片刻** 是一款专为摄影师和摄影爱好者设计的**本地照片双语/擂台式选片工具**。它能够将一次拍摄中相似的几十甚至上百张照片自动归入“同一个瞬间”的组中，然后通过直观的 **左右 A/B 擂台 PK** 方式，让你快速挑出最满意的一张。
@@ -75,50 +77,90 @@
 
 ## 快速开始
 
-> 💡 **强烈推荐小白用户使用 [Trae](https://www.trae.com.cn/)（或 Qoder）**：装好 Trae 后用它打开本项目文件夹，直接告诉 AI：
->
-> > **"先把 pip 换成阿里云源（`https://mirrors.aliyun.com/pypi/simple/`）或清华源（`https://pypi.tuna.tsinghua.edu.cn/simple`），再安装相关依赖并运行这个项目。"**
->
-> 国内默认走的 PyPI 官方源在没有梯子的情况下经常卡到超时，专家模式光依赖就有 2GB 多，不换源基本装不下来。换成阿里 / 清华镜像后整套依赖几分钟就能装完，剩下的交给 Trae 就行。
+### 🖥️ 桌面应用一键启动（推荐）
 
-### 方式一：一键启动（推荐非开发者）
+适合未安装 Python 环境或不熟悉命令行的用户。下载对应系统的安装包，双击安装即可使用。
 
-适合未安装 Python 环境或不熟悉命令行的用户。
-
-1. [下载项目 ZIP 压缩包](https://github.com/zhaoyue4810/pianke/archive/refs/heads/main.zip) 并解压到本地。
-2. 双击运行对应的启动器脚本：
-
-| 系统 | 启动脚本 | 首次运行安全提示过白方式 |
+| 系统 | 下载安装 | 首次启动说明 |
 | :--- | :--- | :--- |
-| **macOS** | `启动_macOS.command` | 若提示“身份不明的开发者”：**按住 Control 键**点击脚本 ➔ 选择 **打开** ➔ 弹窗中再次点击 **打开**。 |
-| **Windows** | `启动_Windows.bat` | 若弹出“Windows 已保护你的电脑”：点击 **更多信息** ➔ 选择 **仍要运行**。 |
+| **macOS** | `片刻.dmg` → 拖到 Applications → 双击打开 | 首次启动会弹出安装向导，选择模式后自动下载 Python 依赖 |
+| **Windows** | `片刻.exe` → 双击安装 | 同上 |
+| **Linux** | `片刻.AppImage` → 双击运行 | 同上 |
 
-*注：启动器会自动在项目独立目录下下载并构建 Python 环境，不污染你的系统环境。国内用户默认启用 PyPI 和模型镜像，可以使用环境变量 `PIANKE_NO_MIRROR=1` 禁用镜像走官方源。*
+> **零依赖运行**：安装包约 5MB（不含 Python）。首次启动时自动通过 [uv](https://docs.astral.sh/uv/) 下载所需的 Python 环境和 pip 包，全程无需手动装任何东西。
 
-### 方式二：手动启动（适合开发者）
+### 🐍 开发者手动启动
 
-如果你已安装 Python 环境并希望手动控制：
+如果你已安装 Python 环境并希望从源码运行：
 
 ```bash
 # 1. 创建并激活虚拟环境
 python3 -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
-# 2. 安装项目依赖（包含所有模式的并集）
+# 2. 安装项目依赖
 pip install -r requirements.txt
 
-# 3. 运行服务（默认端口 5057，自动打开浏览器）
+# 3. 运行服务
 python app.py
 
 # 常用参数：
 python app.py --port 8080 --no-browser
 ```
 
-> ⚠️ **开发模式提示**：若手动安装依赖，可能因传递依赖导致 `opencv-python` 冲突。可运行以下命令修复：
+> ⚠️ **OpenCV 冲突修复**：若手动安装后启动报错，请运行：
 > ```bash
 > pip uninstall -y opencv-python opencv-python-headless
 > pip install --force-reinstall --no-deps "opencv-contrib-python>=4.9"
 > ```
+
+### 🔧 自行构建桌面安装包
+
+需要安装 Rust 和 Node.js，然后：
+
+```bash
+# 安装 Rust（已有可跳过）
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# 安装 Tauri CLI
+cargo install tauri-cli --version "^2"
+
+# 构建（产物在 src-tauri/target/release/bundle/ 下）
+cd src-tauri
+cargo tauri build
+
+# 一次性构建全部平台（需要对应平台的工具链）
+# 或在 GitHub Actions 中自动构建 — 见 .github/workflows/build.yml
+```
+
+> **跨平台 CI 构建**：仓库已配置 GitHub Actions 流水线，推送到 GitHub 后自动构建 macOS / Windows / Linux 三平台安装包。前往 Actions 页面手动触发「构建」workflow 即可获取。
+
+---
+
+## 桌面应用架构
+
+```
+┌──────────────────────────────────────────┐
+│  Tauri (Rust) — 桌面壳                    │
+│  • macOS .app / Windows .exe / Linux     │
+│  • 原生窗口、菜单栏、Dock 图标             │
+│  • 首次启动安装向导（环境检测+模式选择）    │
+│  • 自动下载 Python + pip 依赖             │
+│  • 管理 Flask 子进程生命周期               │
+│  • 退出时自动清理后台进程                  │
+├──────────────────────────────────────────┤
+│  Python (Flask) — 照片选片引擎            │
+│  • 文件扫描、质量初筛、分组                │
+│  • DINOv2 + 人脸识别 + 美学评分           │
+│  • 擂台 PK、水印渲染、文件搬运             │
+│  • RAW / HEIC 解码                       │
+├──────────────────────────────────────────┤
+│  Web UI (HTML/CSS/JS) — 用户界面          │
+│  • 首页配置、处理进度、初筛复核            │
+│  • 分组预览、A/B 擂台 PK                  │
+│  • Winner 总览、相机水印导出              │
+└──────────────────────────────────────────┘
+```
 
 ---
 
