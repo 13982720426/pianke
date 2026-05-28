@@ -5,6 +5,9 @@ use std::process::{Child, Command, Stdio};
 
 use crate::launcher::MirrorConfig;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 /// Python 运行时。
 pub struct PythonRuntime {
     /// venv 中的 Python 路径
@@ -452,11 +455,23 @@ impl PythonRuntime {
             "auto",
             "--no-browser",
         ])
-        // ⚠️ 重要：使用 inherit 而非 piped，避免 pipe buffer 满导致 Flask 进程卡死。
-        // 如果未来需要捕获 Flask 日志，应该用线程单独读取管道。
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
         .current_dir(&self.app_dir);
+
+        #[cfg(windows)]
+        {
+            // Windows 上 Flask 进程不应弹出控制台窗口。
+            // 之前使用 inherit 会让系统为子进程分配控制台，关闭控制台也会把进程一起带走。
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            cmd.stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+        }
+
+        #[cfg(not(windows))]
+        {
+            // 非 Windows 平台保留继承输出，方便在终端里看日志。
+            cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+        }
 
         // 设置镜像环境变量
         if mirror.use_mirror {
