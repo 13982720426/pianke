@@ -339,6 +339,59 @@ def _prepare_onnxruntime() -> tuple[list[str], int]:
 # DINOv2-small：384 维语义特征（不变）
 # =============================================================
 
+
+class _Dinov2Processor:
+    """DINOv2 的本地预处理器。
+
+    这样可以避免依赖 Hugging Face Hub 上的 `preprocessor_config.json`。
+    预处理参数对齐 facebook/dinov2-small 的官方 processor：
+    resize shortest edge -> 256，center crop -> 224，RGB 归一化。
+    """
+
+    def __init__(self) -> None:
+        self.shortest_edge = 256
+        self.crop_size = 224
+        self.mean = (0.485, 0.456, 0.406)
+        self.std = (0.229, 0.224, 0.225)
+
+    def __call__(self, images, return_tensors: str = "pt"):
+        import torch
+
+        if isinstance(images, list):
+            if len(images) != 1:
+                raise ValueError("DINOv2 processor 只接受单张图片")
+            image = images[0]
+        else:
+            image = images
+
+        if not isinstance(image, Image.Image):
+            raise TypeError(f"期望 PIL.Image.Image，实际收到 {type(image)!r}")
+
+        img = image.convert("RGB")
+        w, h = img.size
+        short_side = min(w, h)
+        if short_side <= 0:
+            raise ValueError("空图片无法处理")
+
+        scale = self.shortest_edge / float(short_side)
+        new_w = max(1, int(round(w * scale)))
+        new_h = max(1, int(round(h * scale)))
+        resample = getattr(Image, "Resampling", Image).BICUBIC
+        img = img.resize((new_w, new_h), resample=resample)
+
+        left = max(0, (new_w - self.crop_size) // 2)
+        top = max(0, (new_h - self.crop_size) // 2)
+        right = left + self.crop_size
+        bottom = top + self.crop_size
+        img = img.crop((left, top, right, bottom))
+
+        arr = np.asarray(img, dtype=np.float32) / 255.0
+        arr = (arr - np.array(self.mean, dtype=np.float32)) / np.array(self.std, dtype=np.float32)
+        arr = np.transpose(arr, (2, 0, 1))
+        tensor = torch.from_numpy(arr).unsqueeze(0)
+        return {"pixel_values": tensor}
+
+
 def _ensure_dinov2():
     _ensure_model_storage_configured()
     if "dinov2" in _models:
@@ -348,33 +401,25 @@ def _ensure_dinov2():
             return _models["dinov2"]
         try:
             import torch  # noqa
-            from transformers import AutoImageProcessor, AutoModel
+            from transformers import AutoModel
         except ImportError as e:
             raise VisionUnavailable(
                 f"DINOv2 依赖缺失：{e}。专家模式需要 `pip install torch transformers`。"
             ) from e
         logger.info("vision: 加载 DINOv2-small（首次约 86MB）…")
-        # 优先用本地缓存（HF 在国内常 SSL EOF；缓存命中时绕开 HEAD 校验）
+        # 只加载模型权重；processor 用本地固定预处理，避免依赖 Hub 上的 processor 配置文件。
         try:
-            processor = AutoImageProcessor.from_pretrained(
-                "facebook/dinov2-small",
-                local_files_only=True,
-                cache_dir=str(_hf_hub_cache()),
-            )
             model = AutoModel.from_pretrained(
                 "facebook/dinov2-small",
                 local_files_only=True,
                 cache_dir=str(_hf_hub_cache()),
             ).to(_device()).eval()
         except Exception:
-            processor = AutoImageProcessor.from_pretrained(
-                "facebook/dinov2-small",
-                cache_dir=str(_hf_hub_cache()),
-            )
             model = AutoModel.from_pretrained(
                 "facebook/dinov2-small",
                 cache_dir=str(_hf_hub_cache()),
             ).to(_device()).eval()
+        processor = _Dinov2Processor()
         _models["dinov2"] = (model, processor)
         logger.info("vision: DINOv2-small 就绪")
     return _models["dinov2"]
