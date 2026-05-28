@@ -1,7 +1,7 @@
 # 片刻 (Pianke) — 跨平台构建流水线
 #
-# 每次推送 tag (v*) 时自动构建 macOS / Windows / Linux 安装包。
-# 产物上传到 GitHub Releases。
+# 推送 main、推送 tag (v*) 或手动触发时构建 macOS / Windows / Linux 安装包。
+# 普通构建产物上传到 workflow artifacts，tag 构建额外发布到 GitHub Releases。
 #
 # macOS:   .dmg
 # Windows: .msi 或 .exe (NSIS)
@@ -13,16 +13,34 @@ name: 构建
 
 on:
   push:
+    branches: [ 'main' ]
     tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
-      mode:
-        description: '构建模式 (fast / expert / all)'
+      platform:
+        description: '构建平台'
         required: false
-        default: 'fast'
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - macos
+          - windows
+          - linux
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   build-macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'macos'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +66,7 @@ jobs:
           if-no-files-found: warn
 
   build-windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +93,7 @@ jobs:
           if-no-files-found: warn
 
   build-linux:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'linux'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -116,6 +136,8 @@ jobs:
     needs: [ build-macos, build-windows, build-linux ]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:

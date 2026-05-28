@@ -5,7 +5,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#-桌面应用一键启动)
 [![Tauri](https://img.shields.io/badge/desktop-Tauri-ffc131?logo=tauri)](src-tauri/)
-[![Build](https://img.shields.io/github/actions/workflow/status/13982720426/pianke/build.yml?branch=tauri-desktop&label=build)](https://github.com/13982720426/pianke/actions/workflows/build.yml)
+[![Build](https://img.shields.io/github/actions/workflow/status/13982720426/pianke/build.yml?branch=main&label=build)](https://github.com/13982720426/pianke/actions/workflows/build.yml)
 [![License: Pianke v2](https://img.shields.io/badge/license-Pianke%20v2-cc785c.svg)](LICENSE)
 
 **片刻** 是一款专为摄影师和摄影爱好者设计的**本地照片双语/擂台式选片工具**。它能够将一次拍摄中相似的几十甚至上百张照片自动归入“同一个瞬间”的组中，然后通过直观的 **左右 A/B 擂台 PK** 方式，让你快速挑出最满意的一张。
@@ -133,7 +133,7 @@ cargo tauri build
 # 或在 GitHub Actions 中自动构建 — 见 .github/workflows/build.yml
 ```
 
-> **跨平台 CI 构建**：仓库已配置 GitHub Actions 流水线，推送到 GitHub 后自动构建 macOS / Windows / Linux 三平台安装包。前往 Actions 页面手动触发「构建」workflow 即可获取。
+> **跨平台 CI 构建**：仓库已配置 GitHub Actions 流水线，推送到 `main` 会自动构建 macOS / Windows / Linux 三平台安装包。也可以在 Actions 页面手动触发「构建」workflow，并选择只构建某一个平台。推送 `v*` tag 时会自动创建 GitHub Release。
 
 ---
 
