@@ -64,7 +64,8 @@ pub fn get_modes(previous: &[String]) -> Vec<ModeInfo> {
         ModeInfo {
             key: "fast".into(),
             label: "极速模式（Fast）".into(),
-            description: "纯本地、极速、适合低配设备。零 AI 模型依赖，图像哈希 + 传统 CV 分组。".into(),
+            description: "纯本地、极速、适合低配设备。零 AI 模型依赖，图像哈希 + 传统 CV 分组。"
+                .into(),
             download_size: "约 200MB".into(),
             time_estimate: "1-3 分钟".into(),
             selected: previous.contains(&"fast".to_string()),

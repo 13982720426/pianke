@@ -51,6 +51,13 @@ jobs:
       - name: 安装 Tauri CLI
         run: cargo install tauri-cli --version "^2"
 
+      - name: 打包内置 uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          mkdir -p scripts/bin
+          cp "$HOME/.local/bin/uv" scripts/bin/uv
+          chmod +x scripts/bin/uv
+
       - name: 构建 Tauri 应用
         run: |
           cd src-tauri
@@ -76,6 +83,13 @@ jobs:
 
       - name: 安装 Tauri CLI
         run: cargo install tauri-cli --version "^2"
+
+      - name: 打包内置 uv
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://astral.sh/uv/install.ps1 | iex"
+          New-Item -ItemType Directory -Force scripts\bin
+          Copy-Item "$env:USERPROFILE\.local\bin\uv.exe" scripts\bin\uv.exe
+        shell: pwsh
 
       - name: 构建 Tauri 应用
         run: |
@@ -115,6 +129,13 @@ jobs:
 
       - name: 安装 Tauri CLI
         run: cargo install tauri-cli --version "^2"
+
+      - name: 打包内置 uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          mkdir -p scripts/bin
+          cp "$HOME/.local/bin/uv" scripts/bin/uv
+          chmod +x scripts/bin/uv
 
       - name: 构建 Tauri 应用
         run: |

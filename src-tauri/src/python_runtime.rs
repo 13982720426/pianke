@@ -26,7 +26,11 @@ impl PythonRuntime {
             return Ok(app_dir);
         }
 
-        log::info!("Extracting resources from {:?} to {:?}", resource_dir, app_dir);
+        log::info!(
+            "Extracting resources from {:?} to {:?}",
+            resource_dir,
+            app_dir
+        );
 
         // 确定真正的资源根目录：处理 _up_ 目录
         let src_dir = if resource_dir.join("_up_").join("app.py").exists() {
@@ -50,10 +54,12 @@ impl PythonRuntime {
             if cwd.join("app.py").exists() {
                 return Ok(cwd);
             }
-            anyhow::bail!("未找到 app.py（尝试路径: {:?}, {:?}, {:?}）",
+            anyhow::bail!(
+                "未找到 app.py（尝试路径: {:?}, {:?}, {:?}）",
                 resource_dir.join("app.py"),
                 resource_dir.join("_up_").join("app.py"),
-                dev_root.join("app.py"));
+                dev_root.join("app.py")
+            );
         }
 
         Ok(app_dir)
@@ -85,10 +91,7 @@ impl PythonRuntime {
 
         // 如果 venv 已存在且可用，直接返回
         if venv_python.exists() {
-            if let Ok(output) = Command::new(&venv_python)
-                .arg("--version")
-                .output()
-            {
+            if let Ok(output) = Command::new(&venv_python).arg("--version").output() {
                 if output.status.success() {
                     return Ok(venv_python);
                 }
@@ -97,24 +100,31 @@ impl PythonRuntime {
             let _ = std::fs::remove_dir_all(&venv_dir);
         }
 
-        // 找 uv
-        let uv_path = Self::find_uv();
+        // 找 uv。setup 阶段（ensure_uv=false）不允许 uv 下载 Python，避免窗口显示前卡住。
+        let uv_path = Self::find_uv_for_paths(Some(app_data_dir), None);
         if let Some(uv) = &uv_path {
-            status_cb("使用 uv 创建虚拟环境...");
-            let mut cmd = Command::new(uv);
-            cmd.args(["venv", &venv_dir.to_string_lossy(), "--python", ">=3.10"]);
-            let output = cmd.output()?;
-            if !output.status.success() {
-                let err = String::from_utf8_lossy(&output.stderr);
-                anyhow::bail!("uv venv 失败: {}", err);
+            if !ensure_uv && python_path.is_none() {
+                status_cb("已找到 uv，等待安装页确认后再下载 Python...");
+            } else {
+                status_cb("使用 uv 创建虚拟环境...");
+                let mut cmd = Command::new(uv);
+                let python = python_path
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| ">=3.10".to_string());
+                cmd.args(["venv", &venv_dir.to_string_lossy(), "--python", &python]);
+                let output = cmd.output()?;
+                if !output.status.success() {
+                    let err = String::from_utf8_lossy(&output.stderr);
+                    anyhow::bail!("uv venv 失败: {}", err);
+                }
+                status_cb("虚拟环境已就绪 (uv)");
+                return Ok(venv_python);
             }
-            status_cb("虚拟环境已就绪 (uv)");
-            return Ok(venv_python);
         }
 
         // 没有 uv，尝试用系统 Python 创建
         if let Some(py) = python_path {
-            if py.exists() {
+            if !py.as_os_str().is_empty() {
                 status_cb("使用系统 Python 创建虚拟环境...");
                 let mut cmd = Command::new(py);
                 cmd.args(["-m", "venv", &venv_dir.to_string_lossy()]);
@@ -157,32 +167,91 @@ impl PythonRuntime {
         anyhow::bail!("未找到 Python 3.10+，且无法自动安装");
     }
 
-    fn find_uv() -> Option<PathBuf> {
+    fn uv_file_name() -> &'static str {
+        if cfg!(windows) {
+            "uv.exe"
+        } else {
+            "uv"
+        }
+    }
+
+    fn existing_file(path: PathBuf) -> Option<PathBuf> {
+        path.is_file().then_some(path)
+    }
+
+    fn find_uv_for_paths(app_data_dir: Option<&Path>, app_dir: Option<&Path>) -> Option<PathBuf> {
+        // 先查打包进应用资源的 uv。resources 会被提取到 app_data_dir/app。
+        if let Some(dir) = app_dir {
+            if let Some(path) =
+                Self::existing_file(dir.join("scripts").join("bin").join(Self::uv_file_name()))
+            {
+                return Some(path);
+            }
+        }
+        if let Some(dir) = app_data_dir {
+            if let Some(path) = Self::existing_file(
+                dir.join("app")
+                    .join("scripts")
+                    .join("bin")
+                    .join(Self::uv_file_name()),
+            ) {
+                return Some(path);
+            }
+        }
+
         // 检查 PATH
-        if let Ok(path) = std::env::var("PATH") {
-            for dir in path.split(':') {
-                let uv_path = if cfg!(windows) {
-                    PathBuf::from(dir).join("uv.exe")
-                } else {
-                    PathBuf::from(dir).join("uv")
-                };
-                if uv_path.exists() {
-                    return Some(uv_path);
+        if let Some(path) = std::env::var_os("PATH") {
+            for dir in std::env::split_paths(&path) {
+                if let Some(path) = Self::existing_file(dir.join(Self::uv_file_name())) {
+                    return Some(path);
                 }
             }
         }
+
         // 检查常见位置
-        let home = std::env::var("HOME").unwrap_or_default();
-        for dir in &[format!("{}/.local/bin", home), format!("{}/.cargo/bin", home)] {
-            let uv_path = PathBuf::from(&dir).join("uv");
-            if uv_path.exists() {
-                return Some(uv_path);
+        let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"));
+        if let Some(home) = home {
+            let home = PathBuf::from(home);
+            for dir in &[
+                home.join(".local").join("bin"),
+                home.join(".cargo").join("bin"),
+            ] {
+                if let Some(path) = Self::existing_file(dir.join(Self::uv_file_name())) {
+                    return Some(path);
+                }
             }
         }
         None
     }
 
+    fn find_uv() -> Option<PathBuf> {
+        Self::find_uv_for_paths(None, None)
+    }
+
+    fn find_uv_for_app(&self) -> Option<PathBuf> {
+        Self::find_uv_for_paths(None, Some(&self.app_dir))
+    }
+
     fn install_uv() -> anyhow::Result<PathBuf> {
+        if cfg!(windows) {
+            let output = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    "irm https://astral.sh/uv/install.ps1 | iex",
+                ])
+                .output()?;
+
+            if !output.status.success() {
+                let err = String::from_utf8_lossy(&output.stderr);
+                anyhow::bail!("uv 安装失败: {}", err);
+            }
+
+            return Self::find_uv().ok_or_else(|| anyhow::anyhow!("uv 安装后未找到"));
+        }
+
         let output = Command::new("curl")
             .args(["-LSf", "https://astral.sh/uv/install.sh"])
             .stdout(Stdio::piped())
@@ -226,9 +295,14 @@ impl PythonRuntime {
         }
 
         // 使用 uv 安装（更快）
-        if let Some(uv) = Self::find_uv() {
+        if let Some(uv) = self.find_uv_for_app().or_else(Self::find_uv) {
             let mut cmd = Command::new(&uv);
-            cmd.args(["pip", "install", "--python", &self.venv_python.to_string_lossy()]);
+            cmd.args([
+                "pip",
+                "install",
+                "--python",
+                &self.venv_python.to_string_lossy(),
+            ]);
 
             if mirror.use_mirror {
                 cmd.args(["--index-url", &mirror.pypi_url]);
@@ -324,15 +398,23 @@ impl PythonRuntime {
         uninstall.output()?;
 
         // 重新安装 contrib 版
-        let mut reinstall = Command::new(
-            Self::find_uv().as_ref().unwrap_or(&self.venv_python.to_path_buf()),
-        );
-        if Self::find_uv().is_some() {
-            reinstall.args(["pip", "install", "--python", &self.venv_python.to_string_lossy()]);
+        let uv = self.find_uv_for_app().or_else(Self::find_uv);
+        let mut reinstall = Command::new(uv.as_ref().unwrap_or(&self.venv_python));
+        if uv.is_some() {
+            reinstall.args([
+                "pip",
+                "install",
+                "--python",
+                &self.venv_python.to_string_lossy(),
+            ]);
         } else {
             reinstall.arg("-m").arg("pip").arg("install");
         }
-        reinstall.args(["--force-reinstall", "--no-deps", "opencv-contrib-python>=4.9"]);
+        reinstall.args([
+            "--force-reinstall",
+            "--no-deps",
+            "opencv-contrib-python>=4.9",
+        ]);
         reinstall.output()?;
 
         progress_cb("OpenCV 已修复");
@@ -341,13 +423,14 @@ impl PythonRuntime {
 
     /// 检查依赖是否已就绪。
     pub fn deps_ready(&self, modes: &[String]) -> bool {
-        let check_script = if modes.contains(&"expert".to_string()) || modes.contains(&"tycoon".to_string()) {
-            // 检查 torch 和 transformers
-            "import torch; import transformers; import cv2; print('ok')"
-        } else {
-            // 仅检查核心包
-            "import cv2; from PIL import Image; import numpy; print('ok')"
-        };
+        let check_script =
+            if modes.contains(&"expert".to_string()) || modes.contains(&"tycoon".to_string()) {
+                // 检查 torch 和 transformers
+                "import torch; import transformers; import cv2; print('ok')"
+            } else {
+                // 仅检查核心包
+                "import cv2; from PIL import Image; import numpy; print('ok')"
+            };
 
         Command::new(&self.venv_python)
             .args(["-c", check_script])

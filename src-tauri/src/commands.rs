@@ -9,7 +9,7 @@ use tauri::{command, AppHandle, Emitter, Manager, State};
 use serde::Serialize;
 
 use crate::env_check;
-use crate::launcher::{self, AppState, MirrorConfig, state_file_path};
+use crate::launcher::{self, state_file_path, AppState, MirrorConfig};
 use crate::python_runtime::PythonRuntime;
 use crate::updater;
 
@@ -32,19 +32,17 @@ pub struct InitResult {
 
 /// 初始化设置 — 前端加载完成后第一个调用的命令。
 #[command]
-pub fn init_setup(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> InitResult {
+pub fn init_setup(app: AppHandle, state: State<'_, AppState>) -> InitResult {
     let state_path = state_file_path(&state.app_data_dir);
     let mut status_msgs: Vec<String> = Vec::new();
 
     // 确定运行模式
-    let mode = if state.resource_dir.join("app.py").exists() || state.app_dir.join("app.py").exists() {
-        "bundled"
-    } else {
-        "dev"
-    };
+    let mode =
+        if state.resource_dir.join("app.py").exists() || state.app_dir.join("app.py").exists() {
+            "bundled"
+        } else {
+            "dev"
+        };
     status_msgs.push(format!("运行模式: {}", mode));
 
     // ─── 步骤 1：确保 Python 环境就绪 ───
@@ -55,7 +53,9 @@ pub fn init_setup(
             status_msgs.push("未找到 Python，正在尝试通过 uv 安装...".into());
 
             match PythonRuntime::setup_venv(
-                (!state.python_path.as_os_str().is_empty()).then(|| &state.python_path).map(|v| &**v),
+                (!state.python_path.as_os_str().is_empty())
+                    .then(|| &state.python_path)
+                    .map(|v| &**v),
                 &state.app_data_dir,
                 true,
                 |msg| {
@@ -186,15 +186,17 @@ pub fn start_setup(
         .and_then(|s| s.parse().ok())
         .unwrap_or(5057);
 
-    let need_install = saved_state.packages_sig != packages_sig
-        || !runtime.deps_ready(&modes);
+    let need_install = saved_state.packages_sig != packages_sig || !runtime.deps_ready(&modes);
 
     // 后台线程：安装 + 启动 + 导航
     std::thread::spawn(move || {
         if need_install {
             let _ = app.emit(
                 "setup:status",
-                format!("准备安装 {} 个依赖包（首次可能需要几分钟）...", packages.len()),
+                format!(
+                    "准备安装 {} 个依赖包（首次可能需要几分钟）...",
+                    packages.len()
+                ),
             );
 
             if let Err(e) = runtime.install_packages(&packages, &mirror, |msg| {
@@ -234,7 +236,8 @@ pub fn start_setup(
                             } else {
                                 failures += 1;
                                 if failures >= 3 {
-                                    let _ = app.emit("setup:error", "Flask 服务已无响应，请重启应用");
+                                    let _ =
+                                        app.emit("setup:error", "Flask 服务已无响应，请重启应用");
                                     break;
                                 }
                             }

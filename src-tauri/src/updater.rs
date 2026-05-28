@@ -83,7 +83,11 @@ pub fn check_and_apply(
     status_cb(&format!(
         "发现新版本 {}（当前 {}），正在下载...",
         &remote_sha[..8],
-        if local_sha.len() >= 8 { &local_sha[..8] } else { &local_sha }
+        if local_sha.len() >= 8 {
+            &local_sha[..8]
+        } else {
+            &local_sha
+        }
     ));
 
     // 下载 tarball
@@ -167,7 +171,13 @@ fn apply_tarball(tar_path: &Path, app_dir: &Path) -> anyhow::Result<()> {
     let src = entries[0].path();
 
     // 保留文件/目录列表（不被覆盖）
-    let preserve: Vec<&str> = vec![".venv", ".pic_selecter_install.json", "models", "__pycache__", ".git"];
+    let preserve: Vec<&str> = vec![
+        ".venv",
+        ".pic_selecter_install.json",
+        "models",
+        "__pycache__",
+        ".git",
+    ];
 
     // 复制每个项目到 app_dir
     for entry in std::fs::read_dir(&src)? {

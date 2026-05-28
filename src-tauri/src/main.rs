@@ -13,8 +13,8 @@ mod updater;
 
 use std::sync::Mutex;
 
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::Manager;
-use tauri::menu::{Menu, MenuItem, Submenu, PredefinedMenuItem};
 
 fn main() {
     env_logger::init();
@@ -33,19 +33,17 @@ fn main() {
                 .app_data_dir()
                 .map_err(|e| anyhow::anyhow!("无法获取数据目录: {}", e))?;
 
-            let python_path = env_check::find_python()
-                .map(|(_, path)| std::path::PathBuf::from(path));
+            let python_path =
+                env_check::find_python().map(|(_, path)| std::path::PathBuf::from(path));
 
             // 提取资源文件到数据目录
-            let app_dir = python_runtime::PythonRuntime::extract_resources(
-                &resource_dir,
-                &app_data_dir,
-            ).unwrap_or_else(|e| {
-                log::error!("Resource extraction failed: {}", e);
-                // 开发模式：使用项目根目录
-                std::env::current_dir()
-                    .unwrap_or_else(|_| app_data_dir.join("app"))
-            });
+            let app_dir =
+                python_runtime::PythonRuntime::extract_resources(&resource_dir, &app_data_dir)
+                    .unwrap_or_else(|e| {
+                        log::error!("Resource extraction failed: {}", e);
+                        // 开发模式：使用项目根目录
+                        std::env::current_dir().unwrap_or_else(|_| app_data_dir.join("app"))
+                    });
 
             // 尝试快速创建 venv（不阻塞 UI）
             let venv_python = python_runtime::PythonRuntime::setup_venv(
@@ -53,12 +51,17 @@ fn main() {
                 &app_data_dir,
                 false,
                 |_| {},
-            ).unwrap_or_else(|e| {
-                log::warn!("Fast venv creation failed: {} (will retry in init_setup)", e);
+            )
+            .unwrap_or_else(|e| {
+                log::warn!(
+                    "Fast venv creation failed: {} (will retry in init_setup)",
+                    e
+                );
                 std::path::PathBuf::new()
             });
 
-            let home_url = app.get_webview_window("main")
+            let home_url = app
+                .get_webview_window("main")
                 .and_then(|w| w.url().ok())
                 .map(|u| u.to_string())
                 .unwrap_or_default();
@@ -74,21 +77,27 @@ fn main() {
             app.manage(state);
 
             // 设置菜单
-            let menu = Menu::with_items(app, &[
-                &Submenu::with_items(app, "片刻", true, &[
-                    &PredefinedMenuItem::about(app, Some("关于片刻"), None)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &MenuItem::with_id(app, "check_update", "检查更新", true, None::<&str>)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::services(app, None)?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::hide(app, Some("隐藏片刻"))?,
-                    &PredefinedMenuItem::hide_others(app, Some("隐藏其他"))?,
-                    &PredefinedMenuItem::show_all(app, Some("显示全部"))?,
-                    &PredefinedMenuItem::separator(app)?,
-                    &PredefinedMenuItem::quit(app, Some("退出片刻"))?,
-                ])?,
-            ])?;
+            let menu = Menu::with_items(
+                app,
+                &[&Submenu::with_items(
+                    app,
+                    "片刻",
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app, Some("关于片刻"), None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &MenuItem::with_id(app, "check_update", "检查更新", true, None::<&str>)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::services(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::hide(app, Some("隐藏片刻"))?,
+                        &PredefinedMenuItem::hide_others(app, Some("隐藏其他"))?,
+                        &PredefinedMenuItem::show_all(app, Some("显示全部"))?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::quit(app, Some("退出片刻"))?,
+                    ],
+                )?],
+            )?;
             app.set_menu(menu)?;
 
             Ok(())
@@ -189,7 +198,10 @@ fn kill_port_process(port: u16) {
 
 #[cfg(windows)]
 fn kill_port_process(port: u16) {
-    if let Ok(output) = std::process::Command::new("netstat").args(["-ano"]).output() {
+    if let Ok(output) = std::process::Command::new("netstat")
+        .args(["-ano"])
+        .output()
+    {
         let out = String::from_utf8_lossy(&output.stdout);
         for line in out.lines() {
             if line.contains(&format!(":{}", port)) && line.contains("LISTENING") {
