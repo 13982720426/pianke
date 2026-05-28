@@ -4,7 +4,7 @@
 # 普通构建产物上传到 workflow artifacts，tag 构建额外发布到 GitHub Releases。
 #
 # macOS:   .dmg
-# Windows: .msi 或 .exe (NSIS)
+# Windows: .exe (NSIS)
 # Linux:   .AppImage 或 .deb
 #
 # 手动触发：在 GitHub 仓库 Actions 页面点 "Run workflow"。
@@ -54,7 +54,7 @@ jobs:
       - name: 构建 Tauri 应用
         run: |
           cd src-tauri
-          cargo tauri build --ci
+          cargo tauri build --ci --bundles dmg
 
       - name: 上传 macOS 产物
         uses: actions/upload-artifact@v4
@@ -80,7 +80,7 @@ jobs:
       - name: 构建 Tauri 应用
         run: |
           cd src-tauri
-          cargo tauri build --ci
+          cargo tauri build --ci --bundles nsis
         shell: pwsh
 
       - name: 上传 Windows 产物
@@ -88,7 +88,6 @@ jobs:
         with:
           name: pianke-windows
           path: |
-            src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: warn
 
@@ -120,7 +119,7 @@ jobs:
       - name: 构建 Tauri 应用
         run: |
           cd src-tauri
-          cargo tauri build --ci
+          cargo tauri build --ci --bundles deb,appimage
 
       - name: 上传 Linux 产物
         uses: actions/upload-artifact@v4
@@ -148,7 +147,6 @@ jobs:
         with:
           files: |
             artifacts/pianke-macos/*.dmg
-            artifacts/pianke-windows/*.msi
             artifacts/pianke-windows/*.exe
             artifacts/pianke-linux/*.AppImage
             artifacts/pianke-linux/*.deb

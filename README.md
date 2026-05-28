@@ -84,7 +84,7 @@
 | 系统 | 下载安装 | 首次启动说明 |
 | :--- | :--- | :--- |
 | **macOS** | `片刻.dmg` → 拖到 Applications → 双击打开 | 首次启动会弹出安装向导，选择模式后自动下载 Python 依赖 |
-| **Windows** | `片刻.exe` → 双击安装 | 同上 |
+| **Windows** | `片刻_*_setup.exe` → 双击安装 | 同上 |
 | **Linux** | `片刻.AppImage` → 双击运行 | 同上 |
 
 > **零依赖运行**：安装包约 5MB（不含 Python）。首次启动时自动通过 [uv](https://docs.astral.sh/uv/) 下载所需的 Python 环境和 pip 包，全程无需手动装任何东西。
