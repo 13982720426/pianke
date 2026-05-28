@@ -146,8 +146,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/pianke-macos/*.dmg
-            artifacts/pianke-windows/*.exe
-            artifacts/pianke-linux/*.AppImage
-            artifacts/pianke-linux/*.deb
+            artifacts/pianke-macos/**/*.dmg
+            artifacts/pianke-windows/**/*.exe
+            artifacts/pianke-linux/**/*.AppImage
+            artifacts/pianke-linux/**/*.deb
+          fail_on_unmatched_files: true
           generate_release_notes: true
